@@ -1,1800 +1,432 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HTML Height + Size Inspector</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg: #0e0e10;
-    --surface: #18181c;
-    --surface2: #222228;
-    --border: rgba(255,255,255,0.08);
-    --border2: rgba(255,255,255,0.14);
-    --text: #f0f0f4;
-    --text2: #9090a0;
-    --text3: #55556a;
-    --accent: #7c6fff;
-    --accent2: #a594ff;
-    --accent-bg: rgba(124,111,255,0.12);
-    --accent-border: rgba(124,111,255,0.35);
-    --green: #3ecf8e;
-    --green-bg: rgba(62,207,142,0.1);
-    --mono: 'JetBrains Mono', monospace;
-    --sans: 'Nunito', -apple-system, 'Segoe UI', sans-serif;
-    --r: 10px;
-    --r2: 14px;
-  }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow-x: hidden;
-  }
-
-  /* ── Header ── */
-  header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 18px 32px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
-  }
-  .logo-mark {
-    width: 32px; height: 32px;
-    background: var(--accent);
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px; font-weight: 700; color: #fff;
-    font-family: var(--mono);
-    flex-shrink: 0;
-  }
-  header h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
-  header p { font-size: 13px; color: var(--text2); margin-left: auto; font-family: var(--mono); }
-
-  /* ── Main layout ── */
-  main {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-  }
-
-  /* Top section = 2 columns (editor | phone), fixed viewport height */
-  .top-section {
-    display: grid;
-    grid-template-columns: 420px 1fr;
-    height: calc(100vh - 61px);
-    min-height: 640px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  /* Bottom section = full width, scrolls with page */
-  .bottom-section {
-    width: 100%;
-    padding: 24px 32px 40px;
-    background: radial-gradient(ellipse at 50% 0%, rgba(124,111,255,0.04) 0%, transparent 70%);
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-  }
-  .bottom-section .section-title-bar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 4px;
-  }
-  .bottom-section .section-title-bar .dot {
-    width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
-  }
-  .bottom-section .section-title-bar span {
-    font-size: 11px;
-    font-family: var(--mono);
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: var(--text2);
-    font-weight: 700;
-  }
-
-  /* Empty state for bottom section before render */
-  .bottom-empty {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--text3);
-    font-family: var(--mono);
-    font-size: 12px;
-    background: var(--surface);
-    border: 1px dashed var(--border2);
-    border-radius: var(--r2);
-  }
-  .bottom-section.has-data .bottom-empty { display: none; }
-  .bottom-section:not(.has-data) .bottom-data { display: none; }
-
-  /* ── Left panel ── */
-  .left-panel {
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .panel-header {
-    padding: 16px 20px 12px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .panel-header .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-  .panel-header span {
-    font-size: 11px; font-family: var(--mono);
-    text-transform: uppercase; letter-spacing: 1.2px; color: var(--text2);
-  }
-
-  /* ── Device selector ── */
-  .device-section {
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
-  }
-  .device-section label {
-    font-size: 11px; font-family: var(--mono);
-    text-transform: uppercase; letter-spacing: 1px; color: var(--text3);
-    display: block; margin-bottom: 8px;
-  }
-  .device-select {
-    width: 100%;
-    background: var(--surface2);
-    border: 1px solid var(--border2);
-    border-radius: var(--r);
-    color: var(--text);
-    font-family: var(--mono); font-size: 13px;
-    padding: 10px 14px;
-    appearance: none; cursor: pointer;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239090a0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 14px center;
-    padding-right: 36px;
-    transition: border-color 0.15s;
-  }
-  .device-select:focus { outline: none; border-color: var(--accent); }
-
-  .device-specs {
-    margin-top: 10px;
-    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
-  }
-  .spec-card {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 12px;
-  }
-  .spec-card .label {
-    font-size: 10px; font-family: var(--mono);
-    text-transform: uppercase; letter-spacing: 0.8px;
-    color: var(--text3); margin-bottom: 3px;
-  }
-  .spec-card .value {
-    font-size: 14px; font-weight: 500;
-    color: var(--text); font-family: var(--mono);
-  }
-  .spec-card .value span { font-size: 11px; color: var(--text2); font-weight: 400; }
-
-  .custom-row {
-    margin-top: 10px;
-    display: flex; align-items: center; gap: 8px;
-  }
-  .custom-row label {
-    font-size: 12px; color: var(--text2);
-    font-family: var(--mono); flex-shrink: 0; margin-bottom: 0;
-  }
-  .custom-input {
-    flex: 1;
-    background: var(--surface2);
-    border: 1px solid var(--border2);
-    border-radius: 8px;
-    color: var(--text);
-    font-family: var(--mono); font-size: 13px;
-    padding: 7px 12px;
-    transition: border-color 0.15s;
-  }
-  .custom-input:focus { outline: none; border-color: var(--accent); }
-  .custom-input::placeholder { color: var(--text3); }
-
-  /* ── Padding row ── */
-  .padding-row {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px dashed var(--border);
-  }
-  .padding-head {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 8px;
-    gap: 8px;
-  }
-  .padding-head label {
-    font-size: 11px; font-family: var(--mono);
-    text-transform: uppercase; letter-spacing: 1px;
-    color: var(--text3);
-  }
-  .padding-presets {
-    display: flex; gap: 3px;
-  }
-  .pad-preset {
-    background: var(--surface2);
-    border: 1px solid var(--border2);
-    color: var(--text2);
-    font-family: var(--mono);
-    font-size: 10px;
-    padding: 3px 8px;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: all 0.12s;
-    min-width: 26px;
-  }
-  .pad-preset:hover { color: var(--text); border-color: var(--accent); }
-  .pad-preset.active {
-    background: var(--accent); color: #fff; border-color: var(--accent);
-  }
-  .padding-inputs {
-    display: grid;
-    grid-template-columns: 1fr 1fr auto;
-    gap: 8px;
-    align-items: center;
-  }
-  .pad-field {
-    display: flex; align-items: center; gap: 5px;
-    background: var(--surface2);
-    border: 1px solid var(--border2);
-    border-radius: 8px;
-    padding: 5px 10px;
-  }
-  .pad-field:focus-within { border-color: var(--accent); }
-  .pad-icon {
-    font-family: var(--mono); font-size: 12px;
-    color: var(--text3); flex-shrink: 0;
-  }
-  .pad-input {
-    flex: 1; min-width: 0; width: 100%;
-    background: transparent;
-    border: none; outline: none;
-    color: var(--text);
-    font-family: var(--mono); font-size: 13px;
-    padding: 2px 0;
-  }
-  .pad-input::-webkit-outer-spin-button,
-  .pad-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  .pad-unit {
-    font-family: var(--mono); font-size: 10px;
-    color: var(--text3); flex-shrink: 0;
-  }
-  .pad-effective {
-    font-family: var(--mono); font-size: 11px;
-    color: var(--accent2);
-    background: var(--accent-bg);
-    border: 1px solid var(--accent-border);
-    border-radius: 8px;
-    padding: 6px 10px;
-    white-space: nowrap;
-  }
-
-  /* ── Raw → dp Converter ── */
-  .converter-row {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px dashed var(--border);
-  }
-  .converter-head {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 8px; gap: 8px;
-  }
-  .converter-head label {
-    font-size: 11px; font-family: var(--mono);
-    text-transform: uppercase; letter-spacing: 1px;
-    color: var(--text3);
-  }
-  .conv-device-tag {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--accent2);
-    background: var(--accent-bg);
-    border: 1px solid var(--accent-border);
-    border-radius: 4px;
-    padding: 2px 7px;
-  }
-  .converter-inputs {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    gap: 6px;
-    align-items: center;
-  }
-  .conv-field {
-    display: flex; align-items: center; gap: 5px;
-    background: var(--surface2);
-    border: 1px solid var(--border2);
-    border-radius: 8px;
-    padding: 5px 10px;
-  }
-  .conv-field:focus-within { border-color: var(--accent); }
-  .conv-icon {
-    font-family: var(--mono); font-size: 12px;
-    color: #f59e0b; flex-shrink: 0;
-  }
-  .conv-input {
-    flex: 1; min-width: 0; width: 100%;
-    background: transparent;
-    border: none; outline: none;
-    color: var(--text);
-    font-family: var(--mono); font-size: 13px;
-    padding: 2px 0;
-  }
-  .conv-input::-webkit-outer-spin-button,
-  .conv-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  .conv-unit {
-    font-family: var(--mono); font-size: 10px;
-    color: #f59e0b; flex-shrink: 0;
-  }
-  .conv-arrow {
-    font-family: var(--mono); font-size: 16px;
-    color: var(--text3); text-align: center;
-  }
-  .conv-result {
-    background: var(--accent-bg);
-    border: 1px solid var(--accent-border);
-    border-radius: 8px;
-    padding: 6px 10px;
-    display: flex; align-items: center; gap: 5px;
-    justify-content: center;
-  }
-  .conv-result-val {
-    font-family: var(--mono); font-size: 14px; font-weight: 700;
-    color: var(--accent2);
-  }
-  .conv-result-unit {
-    font-family: var(--mono); font-size: 10px;
-    color: var(--accent2); opacity: 0.8;
-  }
-  .conv-formula {
-    font-family: var(--mono); font-size: 10px;
-    color: var(--text3);
-    margin-top: 6px;
-    text-align: center;
-  }
-
-  /* ── Editor wrap ── */
-  .editor-wrap {
-    flex: 1;
-    display: flex; flex-direction: column;
-    overflow: hidden;
-  }
-
-  .editor-top-bar {
-    padding: 14px 20px 8px;
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .editor-label {
-    font-size: 11px; font-family: var(--mono);
-    text-transform: uppercase; letter-spacing: 1px; color: var(--text3);
-  }
-
-  /* Copy / Paste / Clear buttons */
-  .editor-actions {
-    display: flex; gap: 6px;
-  }
-  .action-btn {
-    background: var(--surface2);
-    border: 1px solid var(--border2);
-    border-radius: 6px;
-    color: var(--text2);
-    font-family: var(--mono);
-    font-size: 11px;
-    padding: 4px 10px;
-    cursor: pointer;
-    display: flex; align-items: center; gap: 5px;
-    transition: all 0.15s;
-    white-space: nowrap;
-  }
-  .action-btn:hover { color: var(--text); border-color: var(--accent); }
-  .action-btn.copied { color: var(--green); border-color: var(--green); }
-
-  #html-input {
-    flex: 1;
-    background: transparent;
-    border: none; resize: none;
-    color: var(--text);
-    font-family: var(--mono); font-size: 12.5px;
-    line-height: 1.7;
-    padding: 0 20px 16px;
-    outline: none;
-    overflow-y: auto;
-  }
-  #html-input::placeholder { color: var(--text3); }
-
-  /* ── Render button ── */
-  .render-btn-wrap { padding: 14px 20px; border-top: 1px solid var(--border); }
-  #render-btn {
-    width: 100%;
-    background: var(--accent); color: #fff;
-    border: none; border-radius: var(--r);
-    font-family: var(--sans); font-size: 14px; font-weight: 700;
-    padding: 13px 20px;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 10px;
-    transition: background 0.15s, transform 0.1s;
-    letter-spacing: 0.3px;
-  }
-  #render-btn:hover { background: var(--accent2); }
-  #render-btn:active { transform: scale(0.98); }
-  #render-btn .arrow { font-size: 18px; line-height: 1; transition: transform 0.2s; }
-  #render-btn:hover .arrow { transform: translateX(3px); }
-
-  /* ── Right panel (phone only) ── */
-  .right-panel {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 28px 24px;
-    overflow: hidden;
-    background: radial-gradient(ellipse at 50% 0%, rgba(124,111,255,0.06) 0%, transparent 60%);
-  }
-
-  /* ── Stats wrap (full-width in bottom section) ── */
-  .stats-wrap {
-    width: 100%;
-    display: flex; flex-direction: column; gap: 14px;
-  }
-
-  /* ── Multi-unit comparison table ── */
-  .unit-table {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    overflow: hidden;
-    display: none;
-  }
-  .stats-wrap.has-data .unit-table { display: block; }
-  .ut-header, .ut-row {
-    display: grid;
-    grid-template-columns: 1.1fr 1fr 1.3fr;
-    align-items: center;
-  }
-  .ut-header {
-    background: var(--surface2);
-    border-bottom: 1px solid var(--border);
-  }
-  .ut-row { border-bottom: 1px solid var(--border); }
-  .ut-row:last-child { border-bottom: none; }
-  .ut-row-hl {
-    background: var(--accent-bg);
-    border-color: var(--accent-border);
-  }
-  .ut-cell {
-    padding: 9px 12px;
-    font-family: var(--mono);
-    font-size: 12px;
-  }
-  .ut-header .ut-cell {
-    font-size: 10px;
-    color: var(--text3);
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    font-weight: 700;
-  }
-  .ut-label {
-    color: var(--text2);
-    font-weight: 600;
-    border-right: 1px solid var(--border);
-  }
-  .ut-v {
-    color: var(--text);
-    font-weight: 600;
-    text-align: right;
-  }
-  .ut-row-hl .ut-v { color: var(--accent2); font-size: 13px; font-weight: 700; }
-  .ut-raw {
-    color: #f59e0b;
-    background: rgba(245,158,11,0.05);
-  }
-  .ut-row-hl .ut-raw { color: #fbbf24; }
-  .ut-raw-hdr { color: #f59e0b !important; }
-  .ut-hint {
-    font-size: 9px;
-    color: var(--text3);
-    font-weight: 400;
-    margin-left: 4px;
-    letter-spacing: 0;
-    text-transform: none;
-  }
-
-  /* ── Android log preview ── */
-  .android-log {
-    background: #0a0a0c;
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    overflow: hidden;
-    display: none;
-  }
-  .stats-wrap.has-data .android-log { display: block; }
-  .al-head {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 12px;
-    background: var(--surface2);
-    border-bottom: 1px solid var(--border);
-  }
-  .al-icon { font-size: 14px; }
-  .al-title {
-    font-family: var(--mono);
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text2);
-    font-weight: 700;
-    flex: 1;
-  }
-  .al-copy {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text2);
-    font-family: var(--mono);
-    font-size: 11px;
-    padding: 3px 9px;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .al-copy:hover { color: var(--text); border-color: var(--accent); }
-  .al-copy.copied { color: var(--green); border-color: var(--green); }
-  .al-body {
-    padding: 10px 12px;
-    font-family: var(--mono);
-    font-size: 11px;
-    color: #8df2b4;
-    line-height: 1.6;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-  .al-body .al-key { color: var(--text3); }
-  .al-body .al-num { color: #f59e0b; font-weight: 700; }
-  .al-body .al-raw { color: #fbbf24; }
-
-  /* ── Stats row ── */
-  .stats-row {
-    display: flex; gap: 12px;
-    width: 100%;
-  }
-  .stat-box {
-    flex: 1;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    padding: 14px 16px;
-    min-width: 0;
-  }
-  .stat-box.highlighted { border-color: var(--accent-border); background: var(--accent-bg); }
-  .stat-box .stat-label {
-    font-size: 10px; font-family: var(--mono);
-    text-transform: uppercase; letter-spacing: 1px;
-    color: var(--text3); margin-bottom: 5px;
-  }
-  .stat-box .stat-value {
-    font-size: 22px; font-weight: 700;
-    font-family: var(--mono); color: var(--text); line-height: 1;
-  }
-  .stat-box.highlighted .stat-value { color: var(--accent2); }
-  .stat-box .stat-unit { font-size: 12px; font-weight: 400; color: var(--text2); margin-left: 3px; }
-
-  /* ── Size analysis panel ── */
-  .size-panel {
-    width: 100%;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--r2);
-    overflow: hidden;
-  }
-  .size-panel-head {
-    display: flex; align-items: center; gap: 8px;
-    padding: 11px 16px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface2);
-    cursor: pointer; user-select: none;
-  }
-  .size-panel-head .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
-  .size-panel-head .title {
-    font-size: 11px; font-family: var(--mono);
-    text-transform: uppercase; letter-spacing: 1.2px; color: var(--text2);
-    flex: 1;
-  }
-  .size-panel-head .chevron {
-    font-size: 10px; color: var(--text3);
-    transition: transform 0.2s;
-  }
-  .size-panel.open .chevron { transform: rotate(180deg); }
-  .size-panel-body { display: none; padding: 14px 16px; }
-  .size-panel.open .size-panel-body { display: block; }
-
-  /* Size cards inside panel */
-  .size-cards {
-    display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    gap: 8px;
-    margin-bottom: 14px;
-  }
-  @media (max-width: 1100px) {
-    .size-cards { grid-template-columns: repeat(4, 1fr); }
-  }
-  @media (max-width: 600px) {
-    .size-cards { grid-template-columns: repeat(2, 1fr); }
-  }
-  .s-card {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 10px 8px;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-  }
-  .s-card::before {
-    content: ''; position: absolute;
-    top: 0; left: 0; right: 0; height: 2px;
-  }
-  .s-card.c1::before { background: var(--accent); }
-  .s-card.c2::before { background: var(--green); }
-  .s-card.c3::before { background: #f59e0b; }
-  .s-card.c4::before { background: #06b6d4; }
-  .s-card.c5::before { background: #ec4899; }
-  .s-card.c6::before { background: #8b5cf6; }
-  .s-card.c7::before { background: #14b8a6; }
-  .s-card.c8::before { background: #f43f5e; }
-  .s-card .sv {
-    font-family: var(--mono); font-size: 15px; font-weight: 700;
-    color: var(--text); margin-bottom: 3px;
-  }
-  .s-card .sl {
-    font-size: 9px; color: var(--text3);
-    text-transform: uppercase; letter-spacing: 0.6px; font-family: var(--mono);
-  }
-
-  /* Breakdown bar */
-  .bb-label {
-    font-size: 10px; font-family: var(--mono);
-    text-transform: uppercase; letter-spacing: 1px;
-    color: var(--text3); margin-bottom: 7px;
-  }
-  .bb-bar {
-    height: 6px; border-radius: 3px;
-    background: var(--surface2);
-    overflow: hidden; display: flex;
-    margin-bottom: 10px;
-  }
-  .bb-seg { height: 100%; transition: width 0.4s; }
-  .bb-rows { display: flex; flex-direction: column; gap: 4px; }
-  .bb-row {
-    display: flex; justify-content: space-between; align-items: center;
-    font-family: var(--mono); font-size: 11px;
-  }
-  .bb-row-key { display: flex; align-items: center; gap: 6px; color: var(--text2); }
-  .bb-dot { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
-  .bb-row-val { color: var(--text); }
-  .bb-row-pct { color: var(--text3); margin-left: 6px; }
-
-  /* Health checks */
-  .health-section { margin-top: 12px; }
-  .health-title {
-    font-size: 10px; font-family: var(--mono);
-    text-transform: uppercase; letter-spacing: 1px;
-    color: var(--text3); margin-bottom: 7px;
-  }
-  .health-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 5px;
-  }
-  @media (max-width: 1100px) {
-    .health-grid { grid-template-columns: repeat(3, 1fr); }
-  }
-  @media (max-width: 600px) {
-    .health-grid { grid-template-columns: repeat(2, 1fr); }
-  }
-  .h-item {
-    display: flex; align-items: center; gap: 7px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 7px;
-    padding: 6px 10px;
-  }
-  .h-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-  .h-dot.pass { background: var(--green); }
-  .h-dot.warn { background: #f59e0b; }
-  .h-lbl { font-size: 10px; font-weight: 600; color: var(--text); font-family: var(--mono); }
-  .h-det { font-size: 9px; color: var(--text3); font-family: var(--mono); }
-
-  /* Resource grid */
-  .res-grid {
-    display: grid;
-    grid-template-columns: repeat(9, 1fr);
-    gap: 5px;
-  }
-  @media (max-width: 1100px) {
-    .res-grid { grid-template-columns: repeat(5, 1fr); }
-  }
-  @media (max-width: 600px) {
-    .res-grid { grid-template-columns: repeat(3, 1fr); }
-  }
-  .res-item {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 7px;
-    padding: 8px 10px;
-    display: flex; flex-direction: column; gap: 2px;
-  }
-  .res-icon { font-size: 14px; }
-  .res-num {
-    font-family: var(--mono); font-size: 14px; font-weight: 700;
-    color: var(--text);
-  }
-  .res-lbl {
-    font-size: 9px; color: var(--text3);
-    text-transform: uppercase; letter-spacing: 0.6px; font-family: var(--mono);
-  }
-
-  /* Performance box */
-  .perf-box {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px;
-    display: flex; align-items: center; gap: 14px;
-  }
-  .perf-score {
-    width: 56px; height: 56px;
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-family: var(--mono); font-size: 18px; font-weight: 700;
-    color: #fff;
-    flex-shrink: 0;
-  }
-  .perf-info { flex: 1; min-width: 0; }
-  .perf-label {
-    font-family: var(--mono); font-size: 11px; font-weight: 700;
-    color: var(--text); margin-bottom: 4px;
-  }
-  .perf-desc {
-    font-size: 10px; color: var(--text3); font-family: var(--mono);
-    line-height: 1.5;
-  }
-
-  /* ── Phone frame (unchanged from original) ── */
-  .phone-stage {
-    display: flex; flex-direction: column; align-items: center; gap: 12px;
-  }
-  .phone-wrapper { position: relative; }
-  .phone-frame {
-    position: relative;
-    background: #1a1a1f;
-    border-radius: 48px;
-    border: 2.5px solid #333340;
-    box-shadow:
-      0 0 0 1px #111116,
-      inset 0 0 0 1px rgba(255,255,255,0.05),
-      0 24px 80px rgba(0,0,0,0.6);
-    overflow: hidden;
-    display: flex; flex-direction: column;
-    transition: width 0.3s, height 0.3s;
-  }
-  .phone-frame::before {
-    content: ''; position: absolute;
-    left: -5px; top: 80px; width: 3px; height: 30px;
-    background: #2a2a35; border-radius: 2px 0 0 2px;
-  }
-  .phone-frame::after {
-    content: ''; position: absolute;
-    right: -5px; top: 100px; width: 3px; height: 50px;
-    background: #2a2a35; border-radius: 0 2px 2px 0;
-  }
-  .phone-notch-bar {
-    background: #1a1a1f; padding: 10px 0 6px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; z-index: 2; position: relative;
-  }
-  .notch-pill {
-    width: 90px; height: 24px;
-    background: #0a0a0e; border-radius: 20px;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-  }
-  .notch-pill .cam {
-    width: 10px; height: 10px;
-    background: #1e1e28; border-radius: 50%;
-    border: 1px solid #2a2a38;
-  }
-  .phone-screen {
-    flex: 1; position: relative; overflow: hidden; background: #fff;
-  }
-  .phone-screen iframe { width: 100%; height: 100%; border: none; display: block; }
-
-  /* Padding visual overlays on phone screen */
-  .pad-overlay {
-    position: absolute;
-    top: 0; bottom: 0;
-    background: repeating-linear-gradient(
-      45deg,
-      rgba(124,111,255,0.25),
-      rgba(124,111,255,0.25) 4px,
-      rgba(124,111,255,0.12) 4px,
-      rgba(124,111,255,0.12) 8px
-    );
-    border-left: 1px solid rgba(124,111,255,0.5);
-    border-right: 1px solid rgba(124,111,255,0.5);
-    pointer-events: none;
-    z-index: 5;
-    display: none;
-  }
-  .pad-overlay-l { left: 0; border-left: none; }
-  .pad-overlay-r { right: 0; border-right: none; }
-  .pad-overlay.visible { display: block; }
-  .phone-home-bar {
-    background: #1a1a1f; padding: 8px 0 12px;
-    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  }
-  .home-indicator { width: 100px; height: 4px; background: #3a3a50; border-radius: 4px; }
-  .empty-state {
-    width: 100%; height: 100%;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 8px; color: #aaa; background: #f8f8f8;
-  }
-  .empty-state .icon { font-size: 28px; }
-  .empty-state p { font-size: 12px; font-family: Arial, sans-serif; color: #bbb; }
-
-  /* Height indicator */
-  .height-indicator {
-    position: absolute; right: -80px; top: 0;
-    display: flex; flex-direction: column;
-    align-items: center; gap: 0;
-    opacity: 0; transition: opacity 0.4s;
-  }
-  .height-indicator.visible { opacity: 1; }
-  .h-line { width: 1px; background: var(--accent); flex: 1; min-height: 4px; }
-  .h-cap { width: 12px; height: 1px; background: var(--accent); }
-  .h-label {
-    writing-mode: vertical-rl; font-family: var(--mono);
-    font-size: 10px; color: var(--accent2);
-    padding: 6px 0; white-space: nowrap; transform: rotate(180deg);
-  }
-  .device-name-tag {
-    font-size: 11px; font-family: var(--mono);
-    color: var(--text3); text-align: center;
-  }
-  .scale-note {
-    font-size: 11px; font-family: var(--mono);
-    color: var(--text3); text-align: center; margin-top: -8px;
-  }
-  .placeholder-stats .stat-value { color: var(--text3); }
-  .placeholder-stats .stat-box { opacity: 0.5; }
-
-  /* scrollbar */
-  ::-webkit-scrollbar { width: 5px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy – Kadam</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --surface: #f5f5f5;
+      --text: #1a1a1a;
+      --muted: #555555;
+      --accent: #3a7bd5;
+      --border: #e0e0e0;
+      --radius: 8px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #121212;
+        --surface: #1e1e1e;
+        --text: #e8e8e8;
+        --muted: #aaaaaa;
+        --accent: #7aadff;
+        --border: #2e2e2e;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      font-size: 15px;
+      padding: 0 16px 60px;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    header {
+      padding: 40px 0 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 32px;
+    }
+    header .label {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    header .meta {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    nav {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 40px;
+    }
+    nav h2 {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    nav ol {
+      padding-left: 20px;
+    }
+    nav ol li { margin-bottom: 4px; }
+    nav a { color: var(--accent); text-decoration: none; font-size: 14px; }
+    nav a:hover { text-decoration: underline; }
+    section {
+      margin-bottom: 40px;
+    }
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 20px 0 8px;
+    }
+    p { margin-bottom: 12px; color: var(--text); }
+    ul, ol {
+      padding-left: 22px;
+      margin-bottom: 12px;
+    }
+    li { margin-bottom: 6px; }
+    .callout {
+      background: var(--surface);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 14px 18px;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    th {
+      background: var(--surface);
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+    }
+    td {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      vertical-align: top;
+    }
+    a { color: var(--accent); }
+    footer {
+      margin-top: 60px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--muted);
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
 
 <header>
-  <div class="logo-mark">{h}</div>
-  <h1>HTML Height + Size Inspector</h1>
-  <p>Paste · Render · Measure · Analyze</p>
+  <div class="label">Kadam App</div>
+  <h1>Privacy Policy</h1>
+  <div class="meta">Last Updated: April 26, 2026 &nbsp;·&nbsp; Effective: April 26, 2026</div>
 </header>
 
-<main>
-  <div class="top-section">
-  <!-- ── Left Panel ── -->
-  <div class="left-panel">
-    <div class="panel-header">
-      <div class="dot"></div>
-      <span>Device &amp; HTML</span>
-    </div>
+<nav>
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#introduction">Introduction</a></li>
+    <li><a href="#information-we-collect">Information We Collect</a></li>
+    <li><a href="#how-we-use">How We Use Your Information</a></li>
+    <li><a href="#how-we-share">How We Share Your Information</a></li>
+    <li><a href="#data-retention">Data Retention &amp; Deletion</a></li>
+    <li><a href="#security">Data Security</a></li>
+    <li><a href="#children">Children's Privacy</a></li>
+    <li><a href="#your-rights">Your Rights &amp; Choices</a></li>
+    <li><a href="#third-party">Third-Party Services</a></li>
+    <li><a href="#changes">Changes to This Policy</a></li>
+    <li><a href="#contact">Contact Us</a></li>
+  </ol>
+</nav>
 
-    <div class="device-section">
-      <label>Select Device</label>
-      <select class="device-select" id="device-select">
-        <optgroup label="Google Pixel">
-          <option value="412,915,3,Pixel 9 Pro">Pixel 9 Pro — 412 × 915 px</option>
-          <option value="393,851,2.75,Pixel 8">Pixel 8 — 393 × 851 px</option>
-          <option value="412,892,2.625,Pixel 7">Pixel 7 — 412 × 892 px</option>
-          <option value="412,915,2.625,Pixel 7a">Pixel 7a — 412 × 915 px</option>
-          <option value="360,800,3,Pixel 6a">Pixel 6a — 360 × 800 px</option>
-        </optgroup>
-        <optgroup label="Apple iPhone">
-          <option value="393,852,3,iPhone 16 Pro">iPhone 16 Pro — 393 × 852 px</option>
-          <option value="430,932,3,iPhone 16 Plus">iPhone 16 Plus — 430 × 932 px</option>
-          <option value="390,844,3,iPhone 15">iPhone 15 — 390 × 844 px</option>
-          <option value="375,812,3,iPhone SE (3rd)">iPhone SE (3rd) — 375 × 812 px</option>
-        </optgroup>
-        <optgroup label="Samsung Galaxy">
-          <option value="360,780,3,Galaxy S24">Galaxy S24 — 360 × 780 px</option>
-          <option value="412,883,3.375,Galaxy S24 Ultra">Galaxy S24 Ultra — 412 × 883 px</option>
-          <option value="360,800,2,Galaxy A55">Galaxy A55 — 360 × 800 px</option>
-        </optgroup>
-        <optgroup label="OnePlus">
-          <option value="412,919,3,OnePlus 12">OnePlus 12 — 412 × 919 px</option>
-        </optgroup>
-        <option value="custom,custom,1,Custom">Custom Width</option>
-      </select>
-
-      <div class="device-specs">
-        <div class="spec-card">
-          <div class="label">Screen Width</div>
-          <div class="value" id="spec-w">412 <span>CSS px</span></div>
-        </div>
-        <div class="spec-card">
-          <div class="label">Screen Height</div>
-          <div class="value" id="spec-h">915 <span>CSS px</span></div>
-        </div>
-        <div class="spec-card">
-          <div class="label">Pixel Ratio</div>
-          <div class="value" id="spec-dpr">3× <span>dpr</span></div>
-        </div>
-        <div class="spec-card">
-          <div class="label">Phys. Width</div>
-          <div class="value" id="spec-phys">1236 <span>px</span></div>
-        </div>
-      </div>
-
-      <div class="custom-row" id="custom-row" style="display:none;">
-        <label>Width</label>
-        <input type="number" class="custom-input" id="custom-w" placeholder="e.g. 360" min="200" max="2000">
-        <label>Height</label>
-        <input type="number" class="custom-input" id="custom-h" placeholder="e.g. 800" min="300" max="3000">
-      </div>
-
-      <!-- Padding row -->
-      <div class="padding-row">
-        <div class="padding-head">
-          <label>Container Padding</label>
-          <div class="padding-presets">
-            <button class="pad-preset" data-val="0">0</button>
-            <button class="pad-preset" data-val="8">8</button>
-            <button class="pad-preset" data-val="12">12</button>
-            <button class="pad-preset" data-val="16">16</button>
-            <button class="pad-preset" data-val="24">24</button>
-          </div>
-        </div>
-        <div class="padding-inputs">
-          <div class="pad-field">
-            <span class="pad-icon">├</span>
-            <input type="number" class="custom-input pad-input" id="pad-left" value="0" min="0" max="200" placeholder="L">
-            <span class="pad-unit">dp</span>
-          </div>
-          <div class="pad-field">
-            <span class="pad-icon">┤</span>
-            <input type="number" class="custom-input pad-input" id="pad-right" value="0" min="0" max="200" placeholder="R">
-            <span class="pad-unit">dp</span>
-          </div>
-          <div class="pad-effective" id="pad-effective">Effective: 412 dp</div>
-        </div>
-      </div>
-
-      <!-- Raw px → dp Converter -->
-      <div class="converter-row">
-        <div class="converter-head">
-          <label>Raw px → dp Converter</label>
-          <span class="conv-device-tag" id="conv-device-tag">using Pixel 9 Pro DPR (3×)</span>
-        </div>
-        <div class="converter-inputs">
-          <div class="conv-field">
-            <span class="conv-icon">↕</span>
-            <input type="number" class="custom-input conv-input" id="conv-raw-input" placeholder="Enter raw px" min="0" step="1">
-            <span class="conv-unit">raw px</span>
-          </div>
-          <div class="conv-arrow">→</div>
-          <div class="conv-result" id="conv-result">
-            <span class="conv-result-val" id="conv-dp-val">—</span>
-            <span class="conv-result-unit">dp</span>
-          </div>
-        </div>
-        <div class="conv-formula" id="conv-formula">Formula: raw px ÷ DPR = dp</div>
-      </div>
-    </div>
-
-    <div class="editor-wrap">
-      <div class="editor-top-bar">
-        <div class="editor-label">HTML Source</div>
-        <div class="editor-actions">
-          <button class="action-btn" id="paste-btn" title="Paste from clipboard">⌘ Paste</button>
-          <button class="action-btn" id="copy-btn" title="Copy HTML to clipboard">⎘ Copy</button>
-          <button class="action-btn" id="clear-btn" title="Clear editor">✕ Clear</button>
-        </div>
-      </div>
-      <textarea id="html-input" placeholder="Paste your HTML here...
-
-Example:
-<div style='padding:20px; font-family:sans-serif;'>
-  <h1>Hello World</h1>
-  <p>This content will be rendered inside the phone frame.</p>
-</div>"></textarea>
-    </div>
-
-    <div class="render-btn-wrap">
-      <button id="render-btn">
-        <span>Render &amp; Analyze</span>
-        <span class="arrow">›</span>
-      </button>
-    </div>
+<!-- 1 -->
+<section id="introduction">
+  <h2>1. Introduction</h2>
+  <p>Welcome to <strong>Kadam</strong>, a fitness tracking and social sharing application developed by <strong>Hammad Khan</strong> ("we," "our," or "us"). This Privacy Policy explains what personal information we collect when you use the Kadam app, why we collect it, how we use and protect it, and the choices you have.</p>
+  <p>By creating an account or using Kadam, you agree to the practices described in this Privacy Policy. If you do not agree, please do not use the app.</p>
+  <div class="callout">
+    Kadam is a <strong>free app</strong>. We do not run advertisements, sell your personal data to third parties, or share your information with data brokers.
   </div>
+</section>
 
-  <!-- ── Right Panel (phone only) ── -->
-  <div class="right-panel" id="right-panel">
+<!-- 2 -->
+<section id="information-we-collect">
+  <h2>2. Information We Collect</h2>
 
-    <!-- Phone frame -->
-    <div class="phone-stage" id="phone-stage">
-      <div class="phone-wrapper" id="phone-wrapper">
-        <div class="phone-frame" id="phone-frame">
-          <div class="phone-notch-bar">
-            <div class="notch-pill">
-              <div class="cam"></div>
-            </div>
-          </div>
-          <div class="phone-screen" id="phone-screen">
-            <div class="pad-overlay pad-overlay-l" id="pad-overlay-l"></div>
-            <div class="pad-overlay pad-overlay-r" id="pad-overlay-r"></div>
-            <div class="empty-state" id="empty-state">
-              <div class="icon">&#10064;</div>
-              <p>Paste HTML and click Render</p>
-            </div>
-            <iframe id="preview-frame" style="display:none;" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>
-          </div>
-          <div class="phone-home-bar">
-            <div class="home-indicator"></div>
-          </div>
-        </div>
-        <div class="height-indicator" id="height-ind">
-          <div class="h-cap"></div>
-          <div class="h-line" id="h-line-top"></div>
-          <div class="h-label" id="h-label-text">0 px</div>
-          <div class="h-line" id="h-line-bot"></div>
-          <div class="h-cap"></div>
-        </div>
-      </div>
-      <div class="device-name-tag" id="device-name-tag">Pixel 9 Pro</div>
-      <div class="scale-note" id="scale-note">Rendered at 50% scale</div>
-    </div>
+  <h3>2.1 Account &amp; Profile Information</h3>
+  <p>When you register, we collect:</p>
+  <ul>
+    <li>Display name and username</li>
+    <li>Email address</li>
+    <li>Profile photo (optional)</li>
+    <li>Short bio / description (optional)</li>
+    <li>Account creation date</li>
+    <li>Authentication tokens (access and refresh tokens, stored encrypted on your device)</li>
+  </ul>
+  <p>You may sign up with an email and password or via <strong>Google Sign-In</strong>. For Google Sign-In, we receive your name and email from Google; we do not receive your Google password.</p>
 
+  <h3>2.2 Location Data</h3>
+  <div class="callout">
+    <strong>Location is only collected while you are actively recording an activity.</strong> We do not track your location in the background or when the app is closed.
   </div>
-  </div> <!-- /.top-section -->
+  <p>During an active recording session, we collect:</p>
+  <ul>
+    <li>GPS coordinates (latitude, longitude, altitude) approximately every 3 seconds</li>
+    <li>Timestamps for each GPS point</li>
+    <li>Start and end location addresses (reverse-geocoded)</li>
+    <li>Encoded route polyline for map display</li>
+  </ul>
+  <p>This location data is used to calculate distance, pace, speed, elevation, and to display your activity route on a map.</p>
+
+  <h3>2.3 Health &amp; Fitness Data</h3>
+  <p>Kadam records and stores the following workout data:</p>
+  <ul>
+    <li>Sport type (Run, Ride, Walk, Hike)</li>
+    <li>Distance, duration (moving time and elapsed time)</li>
+    <li>Average and maximum speed, pace</li>
+    <li>Elevation gain, elevation loss, max and min elevation</li>
+    <li>Calories burned (estimated)</li>
+    <li>Heart rate (average and maximum, if your device provides this via sensor)</li>
+    <li>Cadence (if your device provides this)</li>
+    <li>Per-kilometer split data</li>
+    <li>Perceived effort level you enter</li>
+    <li>Tags you add to an activity</li>
+  </ul>
+
+  <h3>2.4 Photos &amp; Media</h3>
+  <ul>
+    <li>Profile photos you upload</li>
+    <li>Photos you attach to activities</li>
+  </ul>
+  <p>Media is stored on Firebase Storage (Google Cloud). Images are compressed before upload. We do not read EXIF metadata from your photos.</p>
+
+  <h3>2.5 Social &amp; Interaction Data</h3>
+  <ul>
+    <li>Users you follow and users who follow you</li>
+    <li>Kudos (likes) you give or receive on activities</li>
+    <li>Comments you write or receive</li>
+    <li>Users you have blocked</li>
+    <li>Reports you submit about activities or other users</li>
+  </ul>
+
+  <h3>2.6 Notifications Data</h3>
+  <p>We store a device push notification token to send you in-app notifications for follows, kudos, and comments. You can disable notifications at any time in Settings.</p>
+
+  <h3>2.7 App Preferences &amp; Settings</h3>
+  <ul>
+    <li>Theme preference (light / dark / system)</li>
+    <li>Language preference</li>
+    <li>Notification enabled/disabled setting</li>
+    <li>Last selected sport type</li>
+    <li>Biometric authentication preference</li>
+    <li>Onboarding completion status</li>
+  </ul>
+
+  <h3>2.8 Usage &amp; Technical Data</h3>
+  <p>We collect limited technical information required for the app to function, including:</p>
+  <ul>
+    <li>API request logs (server-side, for debugging)</li>
+    <li>App version and operating system version</li>
+    <li>Network error information (to diagnose connectivity issues)</li>
+  </ul>
+  <p>We do not currently use third-party analytics or crash reporting SDKs (e.g., Firebase Analytics, Crashlytics) that would profile your in-app behavior.</p>
+</section>
+
+<!-- 3 -->
+<section id="how-we-use">
+  <h2>3. How We Use Your Information</h2>
+  <table>
+    <tr>
+      <th>Purpose</th>
+      <th>Data Used</th>
+    </tr>
+    <tr>
+      <td>Create and manage your account</td>
+      <td>Name, email, profile photo, authentication tokens</td>
+    </tr>
+    <tr>
+      <td>Record and display your activities</td>
+      <td>GPS data, health metrics, activity metadata</td>
+    </tr>
+    <tr>
+      <td>Show your activity route on a map</td>
+      <td>GPS coordinates, route polyline</td>
+    </tr>
+    <tr>
+      <td>Calculate and display fitness statistics</td>
+      <td>Distance, pace, elevation, heart rate, streaks, heatmap</td>
+    </tr>
+    <tr>
+      <td>Power the social feed</td>
+      <td>Activity data, profile info, follow relationships</td>
+    </tr>
+    <tr>
+      <td>Send push notifications</td>
+      <td>Notification token, notification events (follow, kudos, comment)</td>
+    </tr>
+    <tr>
+      <td>Content moderation &amp; safety</td>
+      <td>Report/block data, activity content</td>
+    </tr>
+    <tr>
+      <td>Account deletion processing</td>
+      <td>Account data, deletion reason</td>
+    </tr>
+    <tr>
+      <td>Provide customer support</td>
+      <td>Account and activity data you share with us in correspondence</td>
+    </tr>
+  </table>
+  <p>We do not use your data for targeted advertising, automated profiling, or sale to third parties.</p>
+</section>
+
+<!-- 4 -->
+<section id="how-we-share">
+  <h2>4. How We Share Your Information</h2>
+  <p>We do not sell your personal data. We share information only in the following limited circumstances:</p>
+
+  <h3>4.1 Public Activities</h3>
+  <p>Activities you post with <strong>Public</strong> visibility are visible to all Kadam users, including users you haven't followed. This includes your display name, profile photo, activity stats, route map (if you enable it), and photos. You can set any activity to <strong>Private</strong> before or after posting to restrict visibility.</p>
+
+  <h3>4.2 Service Providers (Subprocessors)</h3>
+  <p>We use the following providers to operate Kadam. They process data on our behalf and are contractually bound to protect it:</p>
+  <ul>
+    <li><strong>Google Firebase</strong> (Authentication, Storage) — account management and media storage</li>
+    <li><strong>Google Play Services / Maps SDK</strong> — location services and map display</li>
+    <li><strong>Push notification delivery service</strong> — delivering follow / kudos / comment notifications</li>
+  </ul>
+
+  <h3>4.3 Legal Requirements</h3>
+  <p>We may disclose your information if required by law, court order, or to protect the rights, property, or safety of Kadam, its users, or the public.</p>
+
+  <h3>4.4 Business Transfer</h3>
+  <p>If Kadam is acquired, merged, or its assets are transferred, your data may be transferred as part of that transaction. We will notify you before your data is subject to a different privacy policy.</p>
+</section>
+
+<!-- 5 -->
+<section id="data-retention">
+  <h2>5. Data Retention &amp; Deletion</h2>
+  <p>We retain your data for as long as your account is active or as needed to provide the service.</p>
+
+  <h3>Account Deletion</h3>
+  <p>You can delete your Kadam account at any time from <strong>Settings → Delete Account</strong>. Upon requesting deletion:</p>
+  <ul>
+    <li>Your account is immediately deactivated and your profile is hidden from other users.</li>
+    <li>Your data is permanently purged from our servers within <strong>30 days</strong> of the deletion request.</li>
+    <li>Cached copies in backup systems may persist for up to 90 days before being overwritten.</li>
+    <li>Content you posted publicly (activities, comments) is removed along with your account.</li>
+  </ul>
+  <p>You may also contact us at <a href="mailto:khamd0786@gmail.com">khamd0786@gmail.com</a> to request deletion of specific data without deleting your account.</p>
+</section>
+
+<!-- 6 -->
+<section id="security">
+  <h2>6. Data Security</h2>
+  <p>We take reasonable technical and organizational measures to protect your data:</p>
+  <ul>
+    <li>All data is transmitted over <strong>HTTPS/TLS</strong> encrypted connections.</li>
+    <li>Authentication tokens are stored in an <strong>encrypted DataStore</strong> (Android Jetpack) on your device.</li>
+    <li>Access tokens have a short expiry; refresh tokens are rotated on use.</li>
+    <li>Media files are stored in Firebase Storage with access controls.</li>
+  </ul>
+  <p>No method of transmission over the internet is 100% secure. We cannot guarantee absolute security, but we are committed to using industry-standard practices.</p>
+  <p>If you believe your account has been compromised, contact us immediately at <a href="mailto:khamd0786@gmail.com">khamd0786@gmail.com</a>.</p>
+</section>
+
+<!-- 7 -->
+<section id="children">
+  <h2>7. Children's Privacy</h2>
+  <p>Kadam is not intended for use by children under the age of <strong>13</strong>. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe your child has created an account on Kadam, please contact us at <a href="mailto:khamd0786@gmail.com">khamd0786@gmail.com</a> and we will promptly delete the account and associated data.</p>
+  <p>By using Kadam, you represent that you are at least 13 years of age.</p>
+</section>
+
+<!-- 8 -->
+<section id="your-rights">
+  <h2>8. Your Rights &amp; Choices</h2>
+
+  <h3>Access &amp; Correction</h3>
+  <p>You can view and edit your profile information (name, username, bio, profile photo) at any time from your profile settings.</p>
+
+  <h3>Activity Visibility</h3>
+  <p>Each activity can be set to <strong>Public</strong> or <strong>Private</strong>. Private activities are only visible to you.</p>
+
+  <h3>Notifications</h3>
+  <p>You can enable or disable push notifications in <strong>Settings</strong>. You can also manage notifications through your device's system settings.</p>
+
+  <h3>Block &amp; Report</h3>
+  <ul>
+    <li>Block any user to prevent them from seeing your content and from interacting with you.</li>
+    <li>Report activities or users that violate our community guidelines.</li>
+    <li>View and manage your blocked users list in <strong>Settings → Blocked Users</strong>.</li>
+  </ul>
+
+  <h3>Account Deletion</h3>
+  <p>You can permanently delete your account and all associated data at any time via <strong>Settings → Delete Account</strong>. See Section 5 for the data purge timeline.</p>
+
+  <h3>Data Requests</h3>
+  <p>To request a copy of the data we hold about you, or to request deletion of specific data, contact us at <a href="mailto:khamd0786@gmail.com">khamd0786@gmail.com</a>. We will respond within 30 days.</p>
+</section>
+
+<!-- 9 -->
+<section id="third-party">
+  <h2>9. Third-Party Services</h2>
+  <p>Kadam integrates the following third-party services, each governed by their own privacy policies:</p>
+  <ul>
+    <li><strong>Google Firebase Authentication</strong> — <a href="https://firebase.google.com/support/privacy" target="_blank">Firebase Privacy Policy</a></li>
+    <li><strong>Google Sign-In</strong> — <a href="https://policies.google.com/privacy" target="_blank">Google Privacy Policy</a></li>
+    <li><strong>Google Maps SDK</strong> — <a href="https://policies.google.com/privacy" target="_blank">Google Privacy Policy</a></li>
+    <li><strong>Google Play Services (Location)</strong> — <a href="https://policies.google.com/privacy" target="_blank">Google Privacy Policy</a></li>
+  </ul>
+  <p>We do not integrate third-party advertising networks, analytics SDKs, or data broker services.</p>
+</section>
+
+<!-- 10 -->
+<section id="changes">
+  <h2>10. Changes to This Policy</h2>
+  <p>We may update this Privacy Policy from time to time. When we make material changes, we will update the "Last Updated" date at the top of this page and, where feasible, notify you in the app. Your continued use of Kadam after any changes constitutes your acceptance of the updated policy.</p>
+  <p>We encourage you to review this policy periodically.</p>
+</section>
+
+<!-- 11 -->
+<section id="contact">
+  <h2>11. Contact Us</h2>
+  <p>If you have questions, concerns, or requests regarding this Privacy Policy or how we handle your data, please contact us:</p>
+  <ul>
+    <li><strong>Developer:</strong> Hammad Khan</li>
+    <li><strong>Email:</strong> <a href="mailto:khamd0786@gmail.com">khamd0786@gmail.com</a></li>
+    <li><strong>App:</strong> Kadam (com.kadam.run)</li>
+  </ul>
+  <p>We will respond to privacy-related inquiries within <strong>30 days</strong>.</p>
+</section>
+
+<footer>
+  <p>© 2026 Hammad Khan · Kadam App · <a href="terms_of_service.html">Terms of Service</a></p>
+</footer>
 
-  <!-- ── Bottom Section (full-width details) ── -->
-  <div class="bottom-section" id="bottom-section">
-    <div class="section-title-bar">
-      <div class="dot"></div>
-      <span>Measurements &amp; Analysis</span>
-    </div>
-
-    <div class="bottom-empty">Paste HTML and click <b>Render &amp; Analyze</b> to see measurements, Android log, and size &amp; structure analysis here.</div>
-
-    <div class="bottom-data">
-      <!-- Stats row + multi-unit table + Android log -->
-      <div class="stats-wrap">
-        <!-- Top summary pills -->
-        <div class="stats-row placeholder-stats" id="stats-row">
-          <div class="stat-box">
-            <div class="stat-label">Effective Width</div>
-            <div class="stat-value" id="out-w">—<span class="stat-unit">dp</span></div>
-          </div>
-          <div class="stat-box highlighted">
-            <div class="stat-label">Rendered Height</div>
-            <div class="stat-value" id="out-h">—<span class="stat-unit">dp</span></div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Viewport Height</div>
-            <div class="stat-value" id="out-vh">—<span class="stat-unit">dp</span></div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Scrollable</div>
-            <div class="stat-value" id="out-scroll">—</div>
-          </div>
-        </div>
-
-        <!-- Multi-unit table: dp (CSS px) | raw px -->
-        <div class="unit-table" id="unit-table">
-          <div class="ut-header">
-            <div class="ut-cell ut-label">Measurement</div>
-            <div class="ut-cell">dp <span class="ut-hint">(CSS px)</span></div>
-            <div class="ut-cell ut-raw-hdr">raw px <span class="ut-hint" id="ut-dpr-hint">@ 2.625× DPR</span></div>
-          </div>
-          <div class="ut-row">
-            <div class="ut-cell ut-label">Width</div>
-            <div class="ut-cell ut-v" id="ut-w-dp">—</div>
-            <div class="ut-cell ut-v ut-raw" id="ut-w-raw">—</div>
-          </div>
-          <div class="ut-row ut-row-hl">
-            <div class="ut-cell ut-label">Height</div>
-            <div class="ut-cell ut-v" id="ut-h-dp">—</div>
-            <div class="ut-cell ut-v ut-raw" id="ut-h-raw">—</div>
-          </div>
-          <div class="ut-row">
-            <div class="ut-cell ut-label">Viewport</div>
-            <div class="ut-cell ut-v" id="ut-vh-dp">—</div>
-            <div class="ut-cell ut-v ut-raw" id="ut-vh-raw">—</div>
-          </div>
-        </div>
-
-        <!-- Android log preview -->
-        <div class="android-log" id="android-log">
-          <div class="al-head">
-            <span class="al-icon">🤖</span>
-            <span class="al-title">Simulated Android Log</span>
-            <button class="al-copy" id="al-copy" title="Copy log">⎘</button>
-          </div>
-          <div class="al-body" id="al-body">Run to see Android-style output…</div>
-        </div>
-      </div>
-
-      <!-- Size analysis panel -->
-      <div class="size-panel" id="size-panel">
-        <div class="size-panel-head" onclick="this.closest('.size-panel').classList.toggle('open')">
-          <div class="dot"></div>
-          <div class="title">Size &amp; Structure Analysis</div>
-          <span class="chevron">▼</span>
-        </div>
-        <div class="size-panel-body">
-          <div class="size-cards">
-            <div class="s-card c1">
-              <div class="sv" id="sz-raw">—</div>
-              <div class="sl">Raw Size</div>
-            </div>
-            <div class="s-card c2">
-              <div class="sv" id="sz-gzip">—</div>
-              <div class="sl">Est. gzip</div>
-            </div>
-            <div class="s-card c3">
-              <div class="sv" id="sz-lines">—</div>
-              <div class="sl">Lines</div>
-            </div>
-            <div class="s-card c4">
-              <div class="sv" id="sz-tags">—</div>
-              <div class="sl">Elements</div>
-            </div>
-            <div class="s-card c5">
-              <div class="sv" id="sz-depth">—</div>
-              <div class="sl">DOM Depth</div>
-            </div>
-            <div class="s-card c6">
-              <div class="sv" id="sz-words">—</div>
-              <div class="sl">Words</div>
-            </div>
-            <div class="s-card c7">
-              <div class="sv" id="sz-imgs">—</div>
-              <div class="sl">Images</div>
-            </div>
-            <div class="s-card c8">
-              <div class="sv" id="sz-links">—</div>
-              <div class="sl">Links</div>
-            </div>
-          </div>
-
-          <div class="bb-label">Content Breakdown</div>
-          <div class="bb-bar" id="bb-bar"></div>
-          <div class="bb-rows" id="bb-rows"></div>
-
-          <div class="health-section">
-            <div class="health-title">Resources</div>
-            <div class="res-grid" id="res-grid"></div>
-          </div>
-
-          <div class="health-section">
-            <div class="health-title">Health Checks</div>
-            <div class="health-grid" id="health-grid"></div>
-          </div>
-
-          <div class="health-section">
-            <div class="health-title">Performance Score</div>
-            <div class="perf-box" id="perf-box"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-</main>
-
-<script>
-const PHONE_DISPLAY_HEIGHT = 520;
-const PHONE_DISPLAY_WIDTH_MAX = 280;
-
-const devices = {
-  "412,915,3,Pixel 9 Pro":       { w:412, h:915,  dpr:3,     name:"Pixel 9 Pro" },
-  "393,851,2.75,Pixel 8":        { w:393, h:851,  dpr:2.75,  name:"Pixel 8" },
-  "412,892,2.625,Pixel 7":       { w:412, h:892,  dpr:2.625, name:"Pixel 7" },
-  "412,915,2.625,Pixel 7a":      { w:412, h:915,  dpr:2.625, name:"Pixel 7a" },
-  "360,800,3,Pixel 6a":          { w:360, h:800,  dpr:3,     name:"Pixel 6a" },
-  "393,852,3,iPhone 16 Pro":     { w:393, h:852,  dpr:3,     name:"iPhone 16 Pro" },
-  "430,932,3,iPhone 16 Plus":    { w:430, h:932,  dpr:3,     name:"iPhone 16 Plus" },
-  "390,844,3,iPhone 15":         { w:390, h:844,  dpr:3,     name:"iPhone 15" },
-  "375,812,3,iPhone SE (3rd)":   { w:375, h:812,  dpr:3,     name:"iPhone SE (3rd)" },
-  "360,780,3,Galaxy S24":        { w:360, h:780,  dpr:3,     name:"Galaxy S24" },
-  "412,883,3.375,Galaxy S24 Ultra":{ w:412, h:883, dpr:3.375, name:"Galaxy S24 Ultra" },
-  "360,800,2,Galaxy A55":        { w:360, h:800,  dpr:2,     name:"Galaxy A55" },
-  "412,919,3,OnePlus 12":        { w:412, h:919,  dpr:3,     name:"OnePlus 12" },
-};
-
-let currentDevice = devices["412,915,3,Pixel 9 Pro"];
-let currentScale  = 1;
-
-const deviceSelect  = document.getElementById('device-select');
-const customRow     = document.getElementById('custom-row');
-const customW       = document.getElementById('custom-w');
-const customH       = document.getElementById('custom-h');
-const phoneFrame    = document.getElementById('phone-frame');
-const phoneScreen   = document.getElementById('phone-screen');
-const previewFrame  = document.getElementById('preview-frame');
-const emptyState    = document.getElementById('empty-state');
-const heightInd     = document.getElementById('height-ind');
-const hLabelText    = document.getElementById('h-label-text');
-const deviceNameTag = document.getElementById('device-name-tag');
-const scaleNote     = document.getElementById('scale-note');
-const statsRow      = document.getElementById('stats-row');
-const htmlInput     = document.getElementById('html-input');
-
-// ── Padding state ─────────────────────────────────────
-const padLeftInp  = document.getElementById('pad-left');
-const padRightInp = document.getElementById('pad-right');
-const padEffective = document.getElementById('pad-effective');
-
-function getPadding() {
-  return {
-    left:  Math.max(0, parseInt(padLeftInp.value)  || 0),
-    right: Math.max(0, parseInt(padRightInp.value) || 0),
-  };
-}
-
-function getEffectiveWidth() {
-  const p = getPadding();
-  return Math.max(100, currentDevice.w - p.left - p.right);
-}
-
-function updateEffectiveDisplay() {
-  const p = getPadding();
-  const eff = getEffectiveWidth();
-  if (p.left === 0 && p.right === 0) {
-    padEffective.textContent = `Effective: ${eff} dp`;
-    padEffective.style.opacity = 0.6;
-  } else {
-    padEffective.innerHTML = `Effective: <b>${eff}</b> dp <span style="color:var(--text3)">(−${p.left + p.right})</span>`;
-    padEffective.style.opacity = 1;
-  }
-}
-
-// ── Device frame ──────────────────────────────────────
-function updatePhoneFrame(device) {
-  const scale = Math.min(
-    PHONE_DISPLAY_WIDTH_MAX / device.w,
-    PHONE_DISPLAY_HEIGHT   / device.h,
-    1
-  );
-  currentScale = scale;
-  const displayW = Math.round(device.w * scale);
-  const displayH = Math.round(device.h * scale);
-  phoneFrame.style.width  = displayW + 'px';
-  phoneFrame.style.height = (displayH + 80) + 'px';
-  const pct = Math.round(scale * 100);
-  scaleNote.textContent = `Rendered at ${pct}% scale`;
-  document.getElementById('spec-w').innerHTML    = device.w + ' <span>CSS px</span>';
-  document.getElementById('spec-h').innerHTML    = device.h + ' <span>CSS px</span>';
-  document.getElementById('spec-dpr').innerHTML  = device.dpr + '× <span>dpr</span>';
-  document.getElementById('spec-phys').innerHTML = Math.round(device.w * device.dpr) + ' <span>px</span>';
-  deviceNameTag.textContent = device.name;
-  updateEffectiveDisplay();
-  updateConverter();     // keep converter in sync with device
-}
-
-deviceSelect.addEventListener('change', () => {
-  const val = deviceSelect.value;
-  if (val === 'custom,custom,1,Custom') {
-    customRow.style.display = 'flex';
-    currentDevice = { w: parseInt(customW.value)||360, h: parseInt(customH.value)||800, dpr:1, name:'Custom' };
-  } else {
-    customRow.style.display = 'none';
-    currentDevice = devices[val];
-  }
-  updatePhoneFrame(currentDevice);
-});
-customW.addEventListener('input', () => {
-  currentDevice = { w:parseInt(customW.value)||360, h:parseInt(customH.value)||800, dpr:1, name:'Custom' };
-  updatePhoneFrame(currentDevice);
-});
-customH.addEventListener('input', () => {
-  currentDevice = { w:parseInt(customW.value)||360, h:parseInt(customH.value)||800, dpr:1, name:'Custom' };
-  updatePhoneFrame(currentDevice);
-});
-updatePhoneFrame(currentDevice);
-
-// Padding inputs live-update effective display
-[padLeftInp, padRightInp].forEach(inp => {
-  inp.addEventListener('input', updateEffectiveDisplay);
-});
-
-// Padding presets — apply to both sides equally
-document.querySelectorAll('.pad-preset').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const v = btn.dataset.val;
-    padLeftInp.value  = v;
-    padRightInp.value = v;
-    document.querySelectorAll('.pad-preset').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    updateEffectiveDisplay();
-  });
-});
-
-// ── Raw px → dp Converter ─────────────────────────────
-// Mirrors Android's `px.toDp()` behavior: rawPx ÷ currentDevice.dpr = dp
-const convRawInput = document.getElementById('conv-raw-input');
-const convDpVal    = document.getElementById('conv-dp-val');
-const convDevTag   = document.getElementById('conv-device-tag');
-const convFormula  = document.getElementById('conv-formula');
-
-function updateConverter() {
-  const dpr = currentDevice.dpr;
-  const raw = parseFloat(convRawInput.value);
-  convDevTag.textContent = `using ${currentDevice.name} DPR (${dpr}×)`;
-
-  if (!isFinite(raw) || raw <= 0) {
-    convDpVal.textContent = '—';
-    convFormula.textContent = `Formula: raw px ÷ ${dpr} = dp`;
-    return;
-  }
-  const dp = raw / dpr;
-  // Format with up to 2 decimals, strip trailing zeros
-  const dpStr = Number(dp.toFixed(2)).toString();
-  convDpVal.textContent = dpStr;
-  convFormula.textContent = `${raw} ÷ ${dpr} = ${dpStr} dp`;
-}
-
-convRawInput.addEventListener('input', updateConverter);
-updateConverter();
-
-// ── Copy / Paste / Clear ──────────────────────────────
-document.getElementById('copy-btn').addEventListener('click', async () => {
-  const txt = htmlInput.value;
-  if (!txt) return;
-  try {
-    await navigator.clipboard.writeText(txt);
-    const btn = document.getElementById('copy-btn');
-    btn.textContent = '✓ Copied!';
-    btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = '⎘ Copy'; btn.classList.remove('copied'); }, 1800);
-  } catch(e) {
-    // fallback
-    htmlInput.select();
-    document.execCommand('copy');
-  }
-});
-
-document.getElementById('paste-btn').addEventListener('click', async () => {
-  try {
-    const text = await navigator.clipboard.readText();
-    htmlInput.value = text;
-    htmlInput.focus();
-  } catch(e) {
-    htmlInput.focus();
-    alert('Paste permission denied. Use Ctrl+V / Cmd+V inside the editor.');
-  }
-});
-
-document.getElementById('clear-btn').addEventListener('click', () => {
-  htmlInput.value = '';
-  htmlInput.focus();
-});
-
-// ── Size analysis ─────────────────────────────────────
-function fmtBytes(b) {
-  if (b < 1024) return b + 'B';
-  return (b/1024).toFixed(1) + 'KB';
-}
-
-function runSizeAnalysis(html) {
-  const bytes = new TextEncoder().encode(html).length;
-  const lines = html.split('\n').length;
-  const gzip  = Math.round(bytes * 0.35);
-
-  document.getElementById('sz-raw').textContent   = fmtBytes(bytes);
-  document.getElementById('sz-gzip').textContent  = fmtBytes(gzip);
-  document.getElementById('sz-lines').textContent = lines;
-
-  // Parse
-  const parser = new DOMParser();
-  const doc    = parser.parseFromString(html, 'text/html');
-  const allEls = doc.querySelectorAll('*').length;
-  document.getElementById('sz-tags').textContent = allEls;
-
-  // DOM depth
-  function maxDepth(el, depth=0) {
-    if (!el.children.length) return depth;
-    let m = depth;
-    for (const c of el.children) m = Math.max(m, maxDepth(c, depth+1));
-    return m;
-  }
-  const depth = maxDepth(doc.body || doc.documentElement);
-  document.getElementById('sz-depth').textContent = depth;
-
-  // Word count (visible text only)
-  const rawText = (doc.body ? doc.body.textContent : '').trim();
-  const wordCount = rawText ? rawText.split(/\s+/).length : 0;
-  document.getElementById('sz-words').textContent =
-    wordCount > 999 ? (wordCount/1000).toFixed(1)+'k' : wordCount;
-
-  // Images & links
-  const imgEls  = doc.querySelectorAll('img');
-  const linkEls = doc.querySelectorAll('a[href]');
-  document.getElementById('sz-imgs').textContent  = imgEls.length;
-  document.getElementById('sz-links').textContent = linkEls.length;
-
-  // Breakdown
-  const styleSize  = [...doc.querySelectorAll('style')].reduce((a,e)=>a+e.textContent.length,0);
-  const scriptSize = [...doc.querySelectorAll('script')].reduce((a,e)=>a+e.textContent.length,0);
-  const tagSize    = (html.match(/<[^>]+>/g)||[]).join('').length;
-  const textSize   = Math.max(0, html.length - styleSize - scriptSize - tagSize);
-  const total      = styleSize + scriptSize + tagSize + textSize || 1;
-
-  const parts = [
-    { label:'HTML Tags',    size:tagSize,    color:'#7c6fff' },
-    { label:'Inline CSS',   size:styleSize,  color:'#3ecf8e' },
-    { label:'Inline JS',    size:scriptSize, color:'#f59e0b' },
-    { label:'Text Content', size:textSize,   color:'#06b6d4' },
-  ];
-
-  document.getElementById('bb-bar').innerHTML = parts.map(p =>
-    `<div class="bb-seg" style="width:${Math.max(1,Math.round(p.size/total*100))}%;background:${p.color}"></div>`
-  ).join('');
-
-  document.getElementById('bb-rows').innerHTML = parts.map(p => {
-    const pct = Math.round(p.size/total*100);
-    return `<div class="bb-row">
-      <div class="bb-row-key"><div class="bb-dot" style="background:${p.color}"></div>${p.label}</div>
-      <div><span class="bb-row-val">${fmtBytes(p.size)}</span><span class="bb-row-pct">${pct}%</span></div>
-    </div>`;
-  }).join('');
-
-  // Resources inventory
-  const resources = [
-    { icon:'🖼️',  label:'Images',       num: imgEls.length },
-    { icon:'🔗',  label:'Links',        num: linkEls.length },
-    { icon:'🎨',  label:'Style Blocks', num: doc.querySelectorAll('style').length },
-    { icon:'⚙️',  label:'Scripts',      num: doc.querySelectorAll('script').length },
-    { icon:'🌐',  label:'External',     num: doc.querySelectorAll('link[href], script[src], img[src^="http"]').length },
-    { icon:'📝',  label:'Forms',        num: doc.querySelectorAll('form').length },
-    { icon:'🔘',  label:'Buttons',      num: doc.querySelectorAll('button').length },
-    { icon:'📥',  label:'Inputs',       num: doc.querySelectorAll('input, textarea, select').length },
-    { icon:'#️⃣',  label:'IDs',          num: doc.querySelectorAll('[id]').length },
-  ];
-  document.getElementById('res-grid').innerHTML = resources.map(r => `
-    <div class="res-item">
-      <div class="res-icon">${r.icon}</div>
-      <div class="res-num">${r.num}</div>
-      <div class="res-lbl">${r.label}</div>
-    </div>`).join('');
-
-  // Health checks
-  const hasDoctype = html.trimStart().toLowerCase().startsWith('<!doctype');
-  const charsetEl  = doc.querySelector('meta[charset]');
-  const viewportEl = doc.querySelector('meta[name="viewport"]');
-  const titleEl    = doc.querySelector('title');
-  const langAttr   = doc.documentElement.getAttribute('lang');
-  const inlineStyles = doc.querySelectorAll('[style]').length;
-
-  const checks = [
-    { lbl:'DOCTYPE',     det: hasDoctype ? 'present' : 'missing',    pass: hasDoctype },
-    { lbl:'Charset',     det: charsetEl ? charsetEl.getAttribute('charset') : 'missing',
-      pass: !!charsetEl },
-    { lbl:'Viewport',    det: viewportEl ? 'present' : 'missing',    pass: !!viewportEl },
-    { lbl:'Title tag',   det: titleEl?.textContent?.trim() ? titleEl.textContent.trim().slice(0,18) : 'missing',
-      pass: !!titleEl?.textContent?.trim() },
-    { lbl:'lang attr',   det: langAttr || 'not set',                 pass: !!langAttr },
-    { lbl:'Images alt',  det: (()=>{
-        if (!imgEls.length) return 'no images';
-        const missing = [...imgEls].filter(i=>!i.hasAttribute('alt')).length;
-        return missing ? missing+'/'+imgEls.length+' missing' : 'all ok';
-      })(),
-      pass: !imgEls.length || [...imgEls].every(i=>i.hasAttribute('alt'))
-    },
-    { lbl:'Inline styles', det: inlineStyles ? inlineStyles+' elements' : 'none',
-      pass: inlineStyles < 10 },
-    { lbl:'H1 heading',  det: doc.querySelectorAll('h1').length+' found',
-      pass: doc.querySelectorAll('h1').length === 1 },
-    { lbl:'Script count', det: doc.querySelectorAll('script').length+' blocks',
-      pass: doc.querySelectorAll('script').length <= 3 },
-    { lbl:'Deprecated',  det: (()=>{
-        const dep = ['center','font','marquee','blink','big','frame','frameset'];
-        const found = dep.filter(t => doc.querySelector(t));
-        return found.length ? found.join(', ') : 'none';
-      })(),
-      pass: !['center','font','marquee','blink','big','frame','frameset'].some(t => doc.querySelector(t))
-    },
-  ];
-
-  document.getElementById('health-grid').innerHTML = checks.map(c => `
-    <div class="h-item">
-      <div class="h-dot ${c.pass?'pass':'warn'}"></div>
-      <div>
-        <div class="h-lbl">${c.lbl}</div>
-        <div class="h-det">${c.det}</div>
-      </div>
-    </div>`).join('');
-
-  // Performance Score (0-100)
-  let score = 100;
-  const kbSize = bytes / 1024;
-  if (kbSize > 10)   score -= 5;
-  if (kbSize > 30)   score -= 10;
-  if (kbSize > 100)  score -= 20;
-  if (kbSize > 250)  score -= 25;
-  if (allEls > 200)  score -= 5;
-  if (allEls > 500)  score -= 10;
-  if (allEls > 1000) score -= 15;
-  if (depth > 15)    score -= 8;
-  if (depth > 25)    score -= 12;
-  if (inlineStyles > 20) score -= 5;
-  const passedChecks = checks.filter(c=>c.pass).length;
-  score -= (checks.length - passedChecks) * 3;
-  score = Math.max(0, Math.min(100, score));
-
-  let scoreColor, scoreLabel, scoreDesc;
-  if (score >= 85)      { scoreColor = '#3ecf8e'; scoreLabel = 'Excellent'; scoreDesc = 'Lightweight, well-structured, and healthy.'; }
-  else if (score >= 65) { scoreColor = '#a594ff'; scoreLabel = 'Good';      scoreDesc = 'Solid structure with minor improvements possible.'; }
-  else if (score >= 45) { scoreColor = '#f59e0b'; scoreLabel = 'Fair';      scoreDesc = 'Some issues with size or structure worth addressing.'; }
-  else                  { scoreColor = '#ef4444'; scoreLabel = 'Needs Work';scoreDesc = 'Heavy, deeply nested, or missing key health items.'; }
-
-  document.getElementById('perf-box').innerHTML = `
-    <div class="perf-score" style="background:${scoreColor}">${score}</div>
-    <div class="perf-info">
-      <div class="perf-label" style="color:${scoreColor}">${scoreLabel}</div>
-      <div class="perf-desc">${scoreDesc}<br>Size: ${fmtBytes(bytes)} · Elements: ${allEls} · Depth: ${depth} · Passed ${passedChecks}/${checks.length} checks</div>
-    </div>`;
-
-  // Open the panel
-  document.getElementById('size-panel').classList.add('open');
-}
-
-// ── Sanitize & build srcdoc ───────────────────────────
-function sanitizeHTML(raw) {
-  // Detect if this looks like a JSON-escaped string (has \" or \n as literals)
-  let html = raw;
-
-  // If it starts/ends with a JSON string wrapper, try to parse it
-  const trimmed = raw.trim();
-  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-      (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
-    try {
-      html = JSON.parse(trimmed.startsWith("'")
-        ? '"' + trimmed.slice(1,-1).replace(/"/g,'\\"') + '"'
-        : trimmed);
-    } catch(e) { /* fall through */ }
-  }
-
-  // Unescape common escape sequences present in raw/stringified HTML
-  html = html
-    .replace(/\\"/g, '"')
-    .replace(/\\'/g, "'")
-    .replace(/\\n/g, '\n')
-    .replace(/\\t/g, '\t')
-    .replace(/\\r/g, '\r')
-    .replace(/\\\\/g, '\\');
-
-  return html;
-}
-
-function buildSrcdoc(html, w) {
-  const isFullDoc = /<!doctype|<html[\s>]/i.test(html);
-  if (isFullDoc) {
-    if (!/<meta[^>]+viewport/i.test(html))
-      html = html.replace(/(<head[^>]*>)/i, `$1\n<meta name="viewport" content="width=${w}, initial-scale=1">`);
-    const baseStyle = `<style>html,body{max-width:${w}px;overflow-x:hidden;box-sizing:border-box;}</style>`;
-    html = html.replace(/(<\/head>)/i, baseStyle + '$1');
-    return html;
-  }
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=${w}, initial-scale=1">
-<style>
-  *, *::before, *::after { box-sizing: border-box; }
-  html, body { margin:0; padding:0; width:${w}px; max-width:${w}px; overflow-x:hidden; }
-</style>
-</head>
-<body>${html}</body>
-</html>`;
-}
-
-// ── Render ────────────────────────────────────────────
-document.getElementById('render-btn').addEventListener('click', () => {
-  const raw = htmlInput.value.trim();
-  if (!raw) return;
-
-  const html     = sanitizeHTML(raw);
-  const padding  = getPadding();
-  const w        = getEffectiveWidth();         // device width minus horizontal padding
-  const fullW    = currentDevice.w;             // device full width (for visual phone frame)
-  const h        = currentDevice.h;
-  const scale    = currentScale;
-  const displayW = Math.round(fullW * scale);
-  const displayH = Math.round(h * scale);
-
-  // iframe renders at EFFECTIVE content width, offset by left padding
-  const displayContentW = Math.round(w * scale);
-  const displayLeftPad  = Math.round(padding.left * scale);
-
-  previewFrame.style.width           = w + 'px';
-  previewFrame.style.height          = h + 'px';
-  previewFrame.style.transform       = `scale(${scale})`;
-  previewFrame.style.transformOrigin = 'top left';
-  previewFrame.style.display         = 'block';
-  previewFrame.style.marginLeft      = displayLeftPad + 'px';
-  emptyState.style.display           = 'none';
-
-  // Visual padding overlays on phone screen
-  const padOverlayL = document.getElementById('pad-overlay-l');
-  const padOverlayR = document.getElementById('pad-overlay-r');
-  const displayRightPad = Math.round(padding.right * scale);
-  if (padding.left > 0) {
-    padOverlayL.style.width = displayLeftPad + 'px';
-    padOverlayL.classList.add('visible');
-  } else {
-    padOverlayL.classList.remove('visible');
-  }
-  if (padding.right > 0) {
-    padOverlayR.style.width = displayRightPad + 'px';
-    padOverlayR.classList.add('visible');
-  } else {
-    padOverlayR.classList.remove('visible');
-  }
-
-  phoneScreen.style.width    = displayW + 'px';
-  phoneScreen.style.height   = displayH + 'px';
-  phoneScreen.style.overflow = 'hidden';
-
-  previewFrame.onload = null;
-  previewFrame.onload = () => {
-    setTimeout(() => {
-      try {
-        const doc  = previewFrame.contentDocument || previewFrame.contentWindow.document;
-        const win  = previewFrame.contentWindow;
-        const body = doc.body;
-        const root = doc.documentElement;
-
-        // === Measure TRUE content height ===
-        const prevIframeH = previewFrame.style.height;
-        const prevBodyH   = body ? body.style.height : '';
-        const prevRootH   = root.style.height;
-
-        previewFrame.style.height = 'auto';
-        if (body) body.style.height = 'auto';
-        root.style.height = 'auto';
-
-        void root.offsetHeight;
-
-        const heights = [
-          root.scrollHeight,
-          root.offsetHeight,
-          body ? body.scrollHeight : 0,
-          body ? body.offsetHeight : 0,
-          body ? body.getBoundingClientRect().height : 0,
-        ];
-
-        let lastElementBottom = 0;
-        if (body && body.lastElementChild) {
-          const rect = body.lastElementChild.getBoundingClientRect();
-          lastElementBottom = rect.bottom + (win.pageYOffset || 0);
-        }
-        heights.push(lastElementBottom);
-
-        const scrollH = Math.max(...heights.map(n => n || 0));
-
-        // Restore
-        previewFrame.style.height = prevIframeH || (h + 'px');
-        if (body) body.style.height = prevBodyH;
-        root.style.height = prevRootH;
-
-        lastMeasure = {
-          w: w,
-          scrollH: scrollH,
-          h: h,
-          scrollable: scrollH > h,
-          dpr: currentDevice.dpr,
-          displayH: displayH,
-        };
-
-        statsRow.classList.remove('placeholder-stats');
-        renderStats();
-      } catch(e) { console.error('Measurement error:', e); }
-    }, 600);
-  };
-
-  previewFrame.srcdoc = buildSrcdoc(html, w);
-  runSizeAnalysis(raw);
-});
-
-// ── Multi-unit rendering ──────────────────────────────
-let lastMeasure = null;
-
-// Format a number for display (strip trailing .0)
-function fmt(n, decimals = 2) {
-  const rounded = Number(n.toFixed(decimals));
-  return rounded.toString();
-}
-
-function renderStats() {
-  if (!lastMeasure) return;
-  const m = lastMeasure;
-  const dpr = m.dpr;
-
-  // Convert CSS px → dp (same number) and → raw (× DPR)
-  const wDp   = m.w;
-  const hDp   = m.scrollH;
-  const vhDp  = m.h;
-  const wRaw  = m.w * dpr;
-  const hRaw  = m.scrollH * dpr;
-  const vhRaw = m.h * dpr;
-
-  // Top summary boxes — show dp (most useful for Android devs)
-  document.getElementById('out-w').innerHTML        = `${fmt(wDp,1)}<span class="stat-unit">dp</span>`;
-  document.getElementById('out-h').innerHTML        = `${fmt(hDp,1)}<span class="stat-unit">dp</span>`;
-  document.getElementById('out-vh').innerHTML       = `${fmt(vhDp,1)}<span class="stat-unit">dp</span>`;
-  document.getElementById('out-scroll').textContent = m.scrollable ? 'Yes' : 'No';
-
-  // Multi-unit comparison table (dp column shows "dp (CSS px)" — same number)
-  document.getElementById('ut-w-dp').textContent  = fmt(wDp, 2);
-  document.getElementById('ut-w-raw').textContent = fmt(wRaw, 2);
-
-  document.getElementById('ut-h-dp').textContent  = fmt(hDp, 2);
-  document.getElementById('ut-h-raw').textContent = fmt(hRaw, 2);
-
-  document.getElementById('ut-vh-dp').textContent  = fmt(vhDp, 2);
-  document.getElementById('ut-vh-raw').textContent = fmt(vhRaw, 2);
-
-  // DPR label in table header
-  document.getElementById('ut-dpr-hint').textContent = `@ ${dpr}× DPR`;
-
-  // Reveal table + log + bottom section
-  document.querySelector('.stats-wrap').classList.add('has-data');
-  document.getElementById('bottom-section').classList.add('has-data');
-
-  // Android-style simulated log line
-  const logLine =
-    `OnHeight Change ` +
-    `<span class="al-key">Width=</span><span class="al-num">${fmt(wDp,5)}</span><span class="al-key">dp</span> ` +
-    `<span class="al-key">Height=</span><span class="al-num">${fmt(hDp,5)}</span><span class="al-key">dp</span> ` +
-    `<span class="al-key">(raw </span><span class="al-raw">${Math.round(wRaw)}×${Math.round(hRaw)}px</span><span class="al-key">)</span> ` +
-    `<span class="al-key">device=</span>${currentDevice.name} ` +
-    `<span class="al-key">dpr=</span>${dpr}`;
-  document.getElementById('al-body').innerHTML = logLine;
-
-  // Height indicator label on phone frame
-  hLabelText.textContent = fmt(hDp,1) + ' dp';
-  heightInd.style.height = (m.displayH + 80) + 'px';
-  heightInd.classList.add('visible');
-}
-
-// Copy simulated log to clipboard
-document.getElementById('al-copy').addEventListener('click', async () => {
-  const el = document.getElementById('al-body');
-  const text = el.innerText || el.textContent;
-  try {
-    await navigator.clipboard.writeText(text);
-    const btn = document.getElementById('al-copy');
-    btn.textContent = '✓';
-    btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = '⎘'; btn.classList.remove('copied'); }, 1500);
-  } catch(e) {}
-});
-</script>
 </body>
 </html>
